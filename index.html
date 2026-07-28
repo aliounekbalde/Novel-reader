@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web Novel Hub</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #0078ff;
+            --console-bg: rgba(30, 30, 30, 0.95);
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-size: 16px;
+        }
+
+        body.light-theme {
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
+            --text-color: #1c1c1e;
+            --console-bg: rgba(255, 255, 255, 0.95);
+        }
+
+        body.sepia-theme {
+            --bg-color: #f4ecd8;
+            --card-bg: #e2d7bf;
+            --text-color: #5b4636;
+            --console-bg: rgba(226, 215, 191, 0.95);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: var(--card-bg);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        header h1 { font-size: 1.2rem; font-weight: 700; }
+        .nav-btns { display: flex; gap: 10px; }
+        .btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        /* MAIN CONTENT VIEWS */
+        .view { display: none; padding: 20px; flex: 1; }
+        .view.active { display: block; }
+
+        /* LIBRARY GRID */
+        .library-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 20px;
+            padding-bottom: 100px;
+        }
+        .book-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .book-cover {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background: #2a2a2a;
+        }
+        .book-info { padding: 10px; text-align: center; }
+        .book-title { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .add-card {
+            border: 2px dashed var(--accent-color);
+            background: transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 230px;
+            cursor: pointer;
+            border-radius: 12px;
+        }
+        .add-card span { font-size: 3rem; color: var(--accent-color); }
+
+        /* READER VIEW */
+        #reader-frame {
+            width: 100%;
+            height: calc(100vh - 140px);
+            border: none;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .reader-container {
+            position: relative;
+            height: calc(100vh - 140px);
+        }
+        .text-extract-container {
+            height: 100%;
+            overflow-y: auto;
+            padding: 20px;
+            font-size: var(--font-size);
+            line-height: 1.6;
+            background: var(--card-bg);
+            border-radius: 8px;
+        }
+        .text-extract-container p { margin-bottom: 15px; padding: 6px; border-radius: 4px; }
+        .highlight-p { background-color: rgba(0, 120, 255, 0.3) !important; }
+
+        /* BOTTOM CONSOLE */
+        .bottom-console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: var(--console-bg);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 100;
+        }
+        .console-btn {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+        }
+        .console-btn.play { background: var(--accent-color); color: white; }
+
+        /* MODALS */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .modal-content h2 { font-size: 1.2rem; margin-bottom: 5px; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        .input-group label { font-size: 0.85rem; opacity: 0.8; }
+        .input-group input, .input-group select {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 id="app-heading">My Library</h1>
+        <div class="nav-btns">
+            <button class="btn" id="library-nav-btn" onclick="showView('library-view')">Library</button>
+            <button class="btn" onclick="openModal('settings-modal')">⚙️</button>
+        </div>
+    </header>
+
+    <div id="library-view" class="view active">
+        <div class="library-grid" id="book-shelf">
+            <div class="add-card" onclick="openModal('add-book-modal')">
+                <span>+</span>
+                <p style="font-weight:600; font-size:0.9rem;">Add Book</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="reader-view" class="view">
+        <div class="reader-container">
+            <iframe id="reader-frame" src="about:blank"></iframe>
+            <div id="text-reader-container" class="text-extract-container" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="bottom-console">
+        <button class="console-btn" onclick="prevChapter()" title="Previous Chapter">⏮</button>
+        <button class="console-btn" onclick="skipParagraph(-1)" title="Previous Line">«</button>
+        <button class="console-btn play" id="play-pause-btn" onclick="togglePlay()">▶</button>
+        <button class="console-btn" onclick="skipParagraph(1)" title="Next Line">»</button>
+        <button class="console-btn" onclick="nextChapter()" title="Next Chapter">⏭</button>
+        <button class="console-btn" onclick="openModal('settings-modal')">⋮</button>
+    </div>
+
+    <div class="modal" id="add-book-modal">
+        <div class="modal-content">
+            <h2>Add New Novel</h2>
+            <div class="input-group">
+                <label>Book Title</label>
+                <input type="text" id="book-title-input" placeholder="e.g. Shadow Slave">
+            </div>
+            <div class="input-group">
+                <label>Book Cover Image URL</label>
+                <input type="url" id="book-cover-input" placeholder="https://image-link.jpg">
+            </div>
+            <div class="input-group">
+                <label>First Chapter URL</label>
+                <input type="url" id="book-url-input" placeholder="https://novel.com/chapter-1">
+            </div>
+            <button class="btn" onclick="saveBook()">Save Book</button>
+            <button class="btn" style="background:#555;" onclick="closeModal('add-book-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <h2>Reader Controls & Style</h2>
+            <div class="input-group">
+                <label>Reading Speed: <b id="speed-val">2.0x</b></label>
+                <input type="range" id="speed-slider" min="0.1" max="3.0" step="0.1" value="2.0" oninput="updateSpeed(this.value)">
+            </div>
+            <div class="input-group">
+                <label>Voice Language</label>
+                <select id="lang-select">
+                    <option value="en-US">English</option>
+                    <option value="ar-SA">Arabic (العربية)</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Theme</label>
+                <select id="theme-select" onchange="changeTheme(this.value)">
+                    <option value="dark">Dark Mode</option>
+                    <option value="light">Light Mode</option>
+                    <option value="sepia">Sepia Mode</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Accent Color</label>
+                <input type="color" id="accent-color-picker" value="#0078ff" onchange="changeAccent(this.value)">
+            </div>
+            <div class="input-group">
+                <label>Font Size: <b id="font-size-val">16px</b></label>
+                <input type="range" min="12" max="28" value="16" oninput="updateFontSize(this.value)">
+            </div>
+            <button class="btn" onclick="closeModal('settings-modal')">Done</button>
+        </div>
+    </div>
+
+    <script>
+        // --- APP STATE & LOCALSTORAGE ---
+        let library = JSON.parse(localStorage.getItem('novel_library')) || [];
+        let currentBookIndex = null;
+        let ttsSpeed = parseFloat(localStorage.getItem('tts_speed')) || 2.0;
+        let isPlaying = false;
+        let paragraphIndex = 0;
+        let paragraphs = [];
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            renderLibrary();
+            document.getElementById('speed-slider').value = ttsSpeed;
+            document.getElementById('speed-val').innerText = ttsSpeed.toFixed(1) + 'x';
+            
+            let savedTheme = localStorage.getItem('app_theme') || 'dark';
+            changeTheme(savedTheme);
+            document.getElementById('theme-select').value = savedTheme;
+
+            let savedAccent = localStorage.getItem('app_accent') || '#0078ff';
+            changeAccent(savedAccent);
+            document.getElementById('accent-color-picker').value = savedAccent;
+        };
+
+        // --- LIBRARY MANAGEMENT ---
+        function renderLibrary() {
+            const shelf = document.getElementById('book-shelf');
+            shelf.innerHTML = `
+                <div class="add-card" onclick="openModal('add-book-modal')">
+                    <span>+</span>
+                    <p style="font-weight:600; font-size:0.9rem;">Add Book</p>
+                </div>
+            `;
+            library.forEach((book, idx) => {
+                const card = document.createElement('div');
+                card.className = 'book-card';
+                card.onclick = () => openBook(idx);
+                card.innerHTML = `
+                    <img class="book-cover" src="${book.cover || 'https://via.placeholder.com/150'}" alt="cover">
+                    <div class="book-info">
+                        <div class="book-title">${book.title}</div>
+                    </div>
+                `;
+                shelf.appendChild(card);
+            });
+        }
+
+        function saveBook() {
+            const title = document.getElementById('book-title-input').value.trim();
+            const cover = document.getElementById('book-cover-input').value.trim();
+            const url = document.getElementById('book-url-input').value.trim();
+
+            if (!title || !url) {
+                alert("Please fill in both Title and URL!");
+                return;
+            }
+
+            library.push({ title, cover, currentUrl: url });
+            localStorage.setItem('novel_library', JSON.stringify(library));
+            renderLibrary();
+            closeModal('add-book-modal');
+            
+            // Reset inputs
+            document.getElementById('book-title-input').value = '';
+            document.getElementById('book-cover-input').value = '';
+            document.getElementById('book-url-input').value = '';
+        }
+
+        function openBook(index) {
+            currentBookIndex = index;
+            const book = library[index];
+            document.getElementById('app-heading').innerText = book.title;
+            showView('reader-view');
+
+            const iframe = document.getElementById('reader-frame');
+            iframe.src = book.currentUrl;
+        }
+
+        // --- NAVIGATION VIEWS ---
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            if (viewId === 'library-view') {
+                document.getElementById('app-heading').innerText = "My Library";
+                stopSpeech();
+            }
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        // --- TTS ENGINE ---
+        function togglePlay() {
+            if (isPlaying) {
+                window.speechSynthesis.pause();
+                isPlaying = false;
+                document.getElementById('play-pause-btn').innerText = '▶';
+            } else {
+                if (window.speechSynthesis.paused) {
+                    window.speechSynthesis.resume();
+                } else {
+                    startSpeech();
+                }
+                isPlaying = true;
+                document.getElementById('play-pause-btn').innerText = '⏸';
+            }
+        }
+
+        function startSpeech() {
+            window.speechSynthesis.cancel();
+            
+            // Try extracting paragraphs from iframe if accessible
+            const iframe = document.getElementById('reader-frame');
+            try {
+                let doc = iframe.contentDocument || iframe.contentWindow.document;
+                paragraphs = Array.from(doc.querySelectorAll('p')).filter(p => p.innerText.trim().length > 0);
+            } catch(e) {
+                console.log("Cross-Origin block: cannot access iframe inner content.");
+            }
+
+            if (paragraphs.length === 0) {
+                alert("If chapter text doesn't read automatically, tap the screen inside the chapter!");
+                return;
+            }
+
+            speakParagraph();
+        }
+
+        function speakParagraph() {
+            if (paragraphIndex >= paragraphs.length) {
+                nextChapter();
+                return;
+            }
+
+            let p = paragraphs[paragraphIndex];
+            p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            paragraphs.forEach(el => el.classList.remove('highlight-p'));
+            p.classList.add('highlight-p');
+
+            let utterance = new SpeechSynthesisUtterance(p.innerText);
+            utterance.rate = ttsSpeed;
+            utterance.lang = document.getElementById('lang-select').value;
+
+            utterance.onend = () => {
+                paragraphIndex++;
+                speakParagraph();
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function skipParagraph(direction) {
+            window.speechSynthesis.cancel();
+            paragraphIndex = Math.max(0, Math.min(paragraphs.length - 1, paragraphIndex + direction));
+            if (isPlaying) speakParagraph();
+        }
+
+        function stopSpeech() {
+            window.speechSynthesis.cancel();
+            isPlaying = false;
+            document.getElementById('play-pause-btn').innerText = '▶';
+        }
+
+        // --- CHAPTER JUMP (+1 LOGIC) ---
+        function nextChapter() {
+            if (currentBookIndex === null) return;
+            let currentUrl = library[currentBookIndex].currentUrl;
+            let match = currentUrl.match(/(\d+)$/);
+            if (match) {
+                let newUrl = currentUrl.replace(/(\d+)$/, parseInt(match[1]) + 1);
+                library[currentBookIndex].currentUrl = newUrl;
+                localStorage.setItem('novel_library', JSON.stringify(library));
+                paragraphIndex = 0;
+                openBook(currentBookIndex);
+            }
+        }
+
+        function prevChapter() {
+            if (currentBookIndex === null) return;
+            let currentUrl = library[currentBookIndex].currentUrl;
+            let match = currentUrl.match(/(\d+)$/);
+            if (match && parseInt(match[1]) > 1) {
+                let newUrl = currentUrl.replace(/(\d+)$/, parseInt(match[1]) - 1);
+                library[currentBookIndex].currentUrl = newUrl;
+                localStorage.setItem('novel_library', JSON.stringify(library));
+                paragraphIndex = 0;
+                openBook(currentBookIndex);
+            }
+        }
+
+        // --- CUSTOMIZATION SETTINGS ---
+        function updateSpeed(val) {
+            ttsSpeed = parseFloat(val);
+            document.getElementById('speed-val').innerText = ttsSpeed.toFixed(1) + 'x';
+            localStorage.setItem('tts_speed', ttsSpeed);
+            if (isPlaying) speakParagraph();
+        }
+
+        function changeTheme(theme) {
+            document.body.className = theme + '-theme';
+            localStorage.setItem('app_theme', theme);
+        }
+
+        function changeAccent(color) {
+            document.documentElement.style.setProperty('--accent-color', color);
+            localStorage.setItem('app_accent', color);
+        }
+
+        function updateFontSize(val) {
+            document.documentElement.style.setProperty('--font-size', val + 'px');
+            document.getElementById('font-size-val').innerText = val + 'px';
+        }
+    </script>
+</body>
+</html>
