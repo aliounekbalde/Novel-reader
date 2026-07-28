@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web Novel Hub</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #0078ff;
+            --console-bg: rgba(25, 25, 25, 0.92);
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-size: 16px;
+        }
+
+        body.light-theme {
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
+            --text-color: #1c1c1e;
+            --console-bg: rgba(240, 240, 245, 0.92);
+        }
+
+        body.sepia-theme {
+            --bg-color: #f4ecd8;
+            --card-bg: #e2d7bf;
+            --text-color: #5b4636;
+            --console-bg: rgba(226, 215, 191, 0.92);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: var(--card-bg);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        header h1 { font-size: 1.1rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }
+        .nav-btns { display: flex; gap: 8px; }
+        .btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        /* MAIN CONTENT VIEWS */
+        .view { display: none; padding: 15px; flex: 1; }
+        .view.active { display: block; }
+
+        /* LIBRARY GRID */
+        .library-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 15px;
+            padding-bottom: 90px;
+        }
+        .book-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            cursor: pointer;
+        }
+        .book-cover {
+            width: 100%;
+            height: 170px;
+            object-fit: cover;
+            background: #2a2a2a;
+        }
+        .book-info { padding: 8px; text-align: center; }
+        .book-title { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .add-card {
+            border: 2px dashed var(--accent-color);
+            background: transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 215px;
+            cursor: pointer;
+            border-radius: 12px;
+        }
+        .add-card span { font-size: 2.5rem; color: var(--accent-color); }
+
+        /* READER CONTAINER & MODES */
+        .reader-viewport {
+            height: calc(100vh - 150px);
+            overflow-y: auto;
+            border-radius: 8px;
+            background: var(--card-bg);
+            padding: 15px;
+            position: relative;
+        }
+        #pdf-canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+        .text-extract-container {
+            font-size: var(--font-size);
+            line-height: 1.7;
+        }
+        .text-extract-container span {
+            display: inline;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .highlight-line {
+            background-color: rgba(0, 120, 255, 0.4) !important;
+            color: #fff !important;
+        }
+
+        /* BOTTOM CONTROL CONSOLE */
+        .bottom-console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 65px;
+            background: var(--console-bg);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 15px;
+            z-index: 100;
+        }
+        .console-btn {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.3rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+        }
+        .console-btn.play { background: var(--accent-color); color: white; }
+
+        /* MODALS */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal-content h2 { font-size: 1.1rem; margin-bottom: 5px; }
+        .input-group { display: flex; flex-direction: column; gap: 4px; }
+        .input-group label { font-size: 0.8rem; opacity: 0.8; }
+        .input-group input, .input-group select {
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 id="app-heading">My Library</h1>
+        <div class="nav-btns">
+            <button class="btn" id="view-toggle-btn" style="display:none;" onclick="toggleReaderMode()">Switch View</button>
+            <button class="btn" onclick="showView('library-view')">Library</button>
+            <button class="btn" onclick="openModal('settings-modal')">⚙️</button>
+        </div>
+    </header>
+
+    <div id="library-view" class="view active">
+        <div class="library-grid" id="book-shelf">
+            <div class="add-card" onclick="openModal('add-book-modal')">
+                <span>+</span>
+                <p style="font-weight:600; font-size:0.85rem;">Add Book</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="reader-view" class="view">
+        <div class="reader-viewport">
+            <div id="pdf-canvas-container"></div>
+            <div id="text-reader-container" class="text-extract-container" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="bottom-console">
+        <button class="console-btn" onclick="skipLine(-5)" title="Rewind 5 Lines">⏮</button>
+        <button class="console-btn" onclick="skipLine(-1)" title="Previous Line">«</button>
+        <button class="console-btn play" id="play-pause-btn" onclick="togglePlay()">▶</button>
+        <button class="console-btn" onclick="skipLine(1)" title="Next Line">»</button>
+        <button class="console-btn" onclick="skipLine(5)" title="Forward 5 Lines">⏭</button>
+        <button class="console-btn" onclick="openModal('settings-modal')">⋮</button>
+    </div>
+
+    <div class="modal" id="add-book-modal">
+        <div class="modal-content">
+            <h2>Add New Book / Collection</h2>
+            <div class="input-group">
+                <label>Book Title</label>
+                <input type="text" id="book-title-input" placeholder="e.g. Shadow Slave Complete">
+            </div>
+            <div class="input-group">
+                <label>Book Cover Image URL</label>
+                <input type="url" id="book-cover-input" placeholder="https://image-link.jpg">
+            </div>
+            <div class="input-group">
+                <label>Upload File (.txt, .epub, .pdf)</label>
+                <input type="file" id="book-file-input" accept=".txt,.epub,.pdf">
+            </div>
+            <button class="btn" onclick="saveBook()">Save & Process Book</button>
+            <button class="btn" style="background:#555;" onclick="closeModal('add-book-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <h2>Reader Controls & Style</h2>
+            <div class="input-group">
+                <label>Reading Speed: <b id="speed-val">2.0x</b></label>
+                <input type="range" id="speed-slider" min="0.1" max="3.0" step="0.1" value="2.0" oninput="updateSpeed(this.value)">
+            </div>
+            <div class="input-group">
+                <label>Language & Speech Engine</label>
+                <select id="lang-select">
+                    <option value="en-US">English</option>
+                    <option value="ar-SA">Arabic (العربية)</option>
+                    <option value="pt-BR">Portuguese (Português)</option>
+                    <option value="ja-JP">Japanese (日本語)</option>
+                    <option value="fr-FR">French (Français)</option>
+                </select>
+            </div>
+            <button class="btn" style="background:#28a745;" onclick="translateCurrentPage()">🌐 Translate Text On-Demand</button>
+            <div class="input-group">
+                <label>Theme</label>
+                <select id="theme-select" onchange="changeTheme(this.value)">
+                    <option value="dark">Dark Mode</option>
+                    <option value="light">Light Mode</option>
+                    <option value="sepia">Sepia Mode</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Accent Color</label>
+                <input type="color" id="accent-color-picker" value="#0078ff" onchange="changeAccent(this.value)">
+            </div>
+            <div class="input-group">
+                <label>Font Size: <b id="font-size-val">16px</b></label>
+                <input type="range" min="12" max="28" value="16" oninput="updateFontSize(this.value)">
+            </div>
+            <button class="btn" onclick="closeModal('settings-modal')">Done</button>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        let library = JSON.parse(localStorage.getItem('novel_library_v3')) || [];
+        let currentBookIndex = null;
+        let ttsSpeed = parseFloat(localStorage.getItem('tts_speed')) || 2.0;
+        let isPlaying = false;
+        let lineIndex = 0;
+        let lineElements = [];
+        let currentPdfData = null;
+        let readerMode = 'pdf'; // 'pdf' or 'text'
+
+        window.onload = () => {
+            renderLibrary();
+            document.getElementById('speed-slider').value = ttsSpeed;
+            document.getElementById('speed-val').innerText = ttsSpeed.toFixed(1) + 'x';
+            
+            let savedTheme = localStorage.getItem('app_theme') || 'dark';
+            changeTheme(savedTheme);
+            document.getElementById('theme-select').value = savedTheme;
+
+            let savedAccent = localStorage.getItem('app_accent') || '#0078ff';
+            changeAccent(savedAccent);
+            document.getElementById('accent-color-picker').value = savedAccent;
+        };
+
+        function renderLibrary() {
+            const shelf = document.getElementById('book-shelf');
+            shelf.innerHTML = `
+                <div class="add-card" onclick="openModal('add-book-modal')">
+                    <span>+</span>
+                    <p style="font-weight:600; font-size:0.85rem;">Add Book</p>
+                </div>
+            `;
+            library.forEach((book, idx) => {
+                const card = document.createElement('div');
+                card.className = 'book-card';
+                card.onclick = () => openBook(idx);
+                card.innerHTML = `
+                    <img class="book-cover" src="${book.cover || 'https://via.placeholder.com/150'}" alt="cover">
+                    <div class="book-info">
+                        <div class="book-title">${book.title}</div>
+                    </div>
+                `;
+                shelf.appendChild(card);
+            });
+        }
+
+        async function saveBook() {
+            const title = document.getElementById('book-title-input').value.trim();
+            const cover = document.getElementById('book-cover-input').value.trim();
+            const fileInput = document.getElementById('book-file-input');
+
+            if (!title || fileInput.files.length === 0) {
+                alert("Please provide a Title and select a File!");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            let extractedText = "";
+            let fileDataUri = null;
+
+            if (file.name.endsWith('.txt')) {
+                extractedText = await file.text();
+            } else if (file.name.endsWith('.pdf')) {
+                fileDataUri = await fileToDataUri(file);
+                extractedText = await parsePDF(file);
+            } else if (file.name.endsWith('.epub')) {
+                extractedText = await parseEPUB(file);
+            }
+
+            library.push({ title, cover, content: extractedText, pdfData: fileDataUri });
+            localStorage.setItem('novel_library_v3', JSON.stringify(library));
+            renderLibrary();
+            closeModal('add-book-modal');
+            
+            document.getElementById('book-title-input').value = '';
+            document.getElementById('book-cover-input').value = '';
+            fileInput.value = '';
+        }
+
+        function fileToDataUri(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function parsePDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + " ";
+            }
+            return fullText;
+        }
+
+        async function parseEPUB(file) {
+            const zip = new JSZip();
+            const contents = await zip.loadAsync(file);
+            let fullText = "";
+            for (let relativePath in contents.files) {
+                if (relativePath.endsWith('.xhtml') || relativePath.endsWith('.html')) {
+                    let htmlStr = await contents.files[relativePath].async('text');
+                    let doc = new DOMParser().parseFromString(htmlStr, 'text/html');
+                    fullText += doc.body.innerText + " ";
+                }
+            }
+            return fullText;
+        }
+
+        async function openBook(index) {
+            currentBookIndex = index;
+            const book = library[index];
+            document.getElementById('app-heading').innerText = book.title;
+            showView('reader-view');
+            document.getElementById('view-toggle-btn').style.display = book.pdfData ? 'inline-block' : 'none';
+
+            // Process text by punctuation marks / line boundaries
+            const container = document.getElementById('text-reader-container');
+            container.innerHTML = '';
+            
+            // Split sentences by punctuation (. ! ? ; \n)
+            const lines = book.content.split(/(?<=[.!?;\n])\s+/).filter(l => l.trim().length > 0);
+            lines.forEach((lineText) => {
+                const span = document.createElement('span');
+                span.innerText = lineText + " ";
+                container.appendChild(span);
+            });
+
+            lineElements = Array.from(container.querySelectorAll('span'));
+            lineIndex = 0;
+
+            if (book.pdfData) {
+                currentPdfData = book.pdfData;
+                renderPdfView(book.pdfData);
+                setReaderMode('pdf');
+            } else {
+                setReaderMode('text');
+            }
+        }
+
+        async function renderPdfView(dataUri) {
+            const container = document.getElementById('pdf-canvas-container');
+            container.innerHTML = '';
+            const pdf = await pdfjsLib.getDocument(dataUri).promise;
+            
+            for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 1.2 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                container.appendChild(canvas);
+            }
+        }
+
+        function setReaderMode(mode) {
+            readerMode = mode;
+            const pdfContainer = document.getElementById('pdf-canvas-container');
+            const textContainer = document.getElementById('text-reader-container');
+
+            if (mode === 'pdf') {
+                pdfContainer.style.display = 'flex';
+                textContainer.style.display = 'none';
+                document.getElementById('view-toggle-btn').innerText = 'Text Mode';
+            } else {
+                pdfContainer.style.display = 'none';
+                textContainer.style.display = 'block';
+                document.getElementById('view-toggle-btn').innerText = 'PDF Mode';
+            }
+        }
+
+        function toggleReaderMode() {
+            setReaderMode(readerMode === 'pdf' ? 'text' : 'pdf');
+        }
+
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            if (viewId === 'library-view') {
+                document.getElementById('app-heading').innerText = "My Library";
+                document.getElementById('view-toggle-btn').style.display = 'none';
+                stopSpeech();
+            }
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        async function translateCurrentPage() {
+            const lang = document.getElementById('lang-select').value.split('-')[0];
+            if (lineElements.length === 0) return;
+
+            alert("Translating text lines, please wait...");
+            for (let el of lineElements) {
+                try {
+                    let res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(el.innerText)}&langpair=autodetect|${lang}`);
+                    let data = await res.json();
+                    if (data.responseData && data.responseData.translatedText) {
+                        el.innerText = data.responseData.translatedText + " ";
+                    }
+                } catch(e) {}
+            }
+            alert("Translation completed!");
+            closeModal('settings-modal');
+        }
+
+        // --- TTS ENGINE (LINE BY LINE) ---
+        function togglePlay() {
+            if (isPlaying) {
+                window.speechSynthesis.pause();
+                isPlaying = false;
+                document.getElementById('play-pause-btn').innerText = '▶';
+            } else {
+                if (window.speechSynthesis.paused) {
+                    window.speechSynthesis.resume();
+                } else {
+                    startSpeech();
+                }
+                isPlaying = true;
+                document.getElementById('play-pause-btn').innerText = '⏸';
+            }
+        }
+
+        function startSpeech() {
+            window.speechSynthesis.cancel();
+            if (lineElements.length === 0) return;
+            speakLine();
+        }
+
+        function speakLine() {
+            if (lineIndex >= lineElements.length) {
+                stopSpeech();
+                return;
+            }
+
+            let el = lineElements[lineIndex];
+            if (readerMode === 'text') {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            lineElements.forEach(item => item.classList.remove('highlight-line'));
+            el.classList.add('highlight-line');
+
+            let utterance = new SpeechSynthesisUtterance(el.innerText);
+            utterance.rate = ttsSpeed;
+            utterance.lang = document.getElementById('lang-select').value;
+
+            utterance.onend = () => {
+                lineIndex++;
+                speakLine();
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function skipLine(direction) {
+            window.speechSynthesis.cancel();
+            lineIndex = Math.max(0, Math.min(lineElements.length - 1, lineIndex + direction));
+            if (isPlaying) speakLine();
+        }
+
+        function stopSpeech() {
+            window.speechSynthesis.cancel();
+            isPlaying = false;
+            document.getElementById('play-pause-btn').innerText = '▶';
+        }
+
+        function updateSpeed(val) {
+            ttsSpeed = parseFloat(val);
+            document.getElementById('speed-val').innerText = ttsSpeed.toFixed(1) + 'x';
+            localStorage.setItem('tts_speed', ttsSpeed);
+            if (isPlaying) speakLine();
+        }
+
+        function changeTheme(theme) {
+            document.body.className = theme + '-theme';
+            localStorage.setItem('app_theme', theme);
+        }
+
+        function changeAccent(color) {
+            document.documentElement.style.setProperty('--accent-color', color);
+            localStorage.setItem('app_accent', color);
+        }
+
+        function updateFontSize(val) {
+            document.documentElement.style.setProperty('--font-size', val + 'px');
+            document.getElementById('font-size-val').innerText = val + 'px';
+        }
+    </script>
+</body>
+</html>
